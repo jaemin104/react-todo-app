@@ -21,12 +21,31 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
         onChange={() => onToggle(todo.id)}
         style={{ marginRight: '10px' }}
       />
-      <span style={{ 
-        textDecoration: todo.completed ? 'line-through' : 'none',
-        flex: 1
+      <div style={{ 
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '5px'
       }}>
-        {todo.text}
-      </span>
+        <span style={{ 
+          textDecoration: todo.completed ? 'line-through' : 'none',
+        }}>
+          {todo.text}
+        </span>
+        <div style={{ display: 'flex', gap: '2px' }}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <span
+              key={star}
+              style={{
+                color: star <= (todo.difficulty || 0) ? '#8D7B68' : '#C8B6A6',
+                fontSize: '14px'
+              }}
+            >
+              ★
+            </span>
+          ))}
+        </div>
+      </div>
       <button 
         onClick={() => onDelete(todo.id)}
         style={{
