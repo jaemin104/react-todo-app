@@ -13,11 +13,18 @@ const PlusCircleIcon = () => (
   </svg>
 );
 
+const BellIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C13.1 2 14 2.9 14 4V4.29C17.03 5.15 19 7.82 19 11V17L21 19V20H3V19L5 17V11C5 7.82 6.97 5.15 10 4.29V4C10 2.9 10.9 2 12 2ZM12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22Z" fill="currentColor"/>
+  </svg>
+);
+
 const dateList: DateInfo[] = getCalendarDatesInRange();
+const today = new Date();
 const initialCenterIdx = dateList.findIndex(d =>
-  d.fullDate.getFullYear() === 2025 &&
-  d.fullDate.getMonth() === 5 && // 6월 (0-indexed)
-  d.fullDate.getDate() === 23
+  d.fullDate.getFullYear() === today.getFullYear() &&
+  d.fullDate.getMonth() === today.getMonth() &&
+  d.fullDate.getDate() === today.getDate()
 );
 const initialCenterDate = dateList[initialCenterIdx]?.fullDate || dateList[0].fullDate;
 
@@ -33,6 +40,11 @@ const TodoList = () => {
   // 날짜별 todos: { 'YYYY-MM-DD': Todo[] }
   const [todosByDate, setTodosByDate] = useState<Record<string, { id: number; text: string; completed: boolean; difficulty: number; }[]>>({});
   const [selectedDate, setSelectedDate] = useState<Date>(initialCenterDate);
+  
+  // 알림 관련 상태
+  const [notifications, setNotifications] = useState<{ id: number; message: string; read: boolean; }[]>([]);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [lastMilestone, setLastMilestone] = useState(0);
 
   // 선택된 날짜의 todo 리스트
   const selectedDateKey = getDateKey(selectedDate);
@@ -40,6 +52,9 @@ const TodoList = () => {
 
   // 총점(모든 날짜의 완료된 todo의 도토리 합)
   const totalPoints = Object.values(todosByDate).flat().filter(t => t.completed).reduce((acc, t) => acc + t.difficulty, 0);
+
+  // 읽지 않은 알림 개수
+  const unreadNotifications = notifications.filter(n => !n.read).length;
 
   // 날짜 스크롤 관련 ref
   const dateListRef = useRef<HTMLDivElement>(null);
@@ -108,9 +123,30 @@ const TodoList = () => {
     }
   }, [isInputActive]);
 
+  // 총점이 10의 배수에 도달했을 때 알림 추가
+  useEffect(() => {
+    const currentMilestone = Math.floor(totalPoints / 10) * 10;
+    if (currentMilestone > lastMilestone && currentMilestone > 0) {
+      const newNotification = {
+        id: Date.now(),
+        message: `총점이 ${currentMilestone}점이 되었어요!`,
+        read: false
+      };
+      setNotifications(prev => [newNotification, ...prev]);
+      setLastMilestone(currentMilestone);
+    }
+  }, [totalPoints, lastMilestone]);
+
   const handleAddTodo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+    
+    // 도토리가 0개인 경우 안내 메시지 표시
+    if (difficulty === 0) {
+      alert('1~5도토리로 우선순위를 설정해주세요!');
+      return;
+    }
+    
     setTodosByDate(prev => {
       const key = selectedDateKey;
       const prevTodos = prev[key] || [];
@@ -137,6 +173,17 @@ const TodoList = () => {
         )
       };
     });
+  };
+
+  // 알림 읽기 처리
+  const handleNotificationClick = () => {
+    setIsNotificationModalOpen(true);
+  };
+
+  const handleCloseNotificationModal = () => {
+    setIsNotificationModalOpen(false);
+    // 모든 알림을 읽음 처리
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   // 날짜 비교 함수 (연,월,일만 비교)
@@ -251,15 +298,141 @@ const TodoList = () => {
         </div>
       </form>
 
+      {/* 알림 아이콘 */}
+      <div
+        onClick={handleNotificationClick}
+        style={{
+          position: 'absolute', left: 0, top: 40,
+          background: 'var(--main-yellow)',
+          borderRadius: '50%',
+          width: 48,
+          height: 48,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 2px 6px #0001',
+          color: 'var(--main-gray)'
+        }}
+      >
+        <BellIcon />
+        {unreadNotifications > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: -4,
+            right: -4,
+            background: '#ff4757',
+            color: 'white',
+            borderRadius: '50%',
+            width: 20,
+            height: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.8rem',
+            fontWeight: 'bold',
+            fontFamily: 'Pretendard'
+          }}>
+            {unreadNotifications}
+          </div>
+        )}
+      </div>
+
       {/* 총점 */}
       <div style={{
-        position: 'absolute', right: 0, top: 40, background: 'var(--main-yellow)',
+        position: 'absolute', right: 0, top: 40,
+        background: 'var(--main-yellow)',
         borderRadius: 20, padding: '8px 20px', display: 'flex', alignItems: 'center', fontSize: '1.3rem',
         color: 'var(--main-gray)', fontFamily: 'Pretendard', boxShadow: '0 2px 6px #0001', gap: 8
       }}>
         <img src={coloredAcorn} alt="acorn" style={{ width: 24, height: 24 }} />
         <span>{totalPoints}</span>
       </div>
+
+      {/* 알림 모달 */}
+      {isNotificationModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={handleCloseNotificationModal}>
+          <div style={{
+            background: 'white',
+            borderRadius: 20,
+            padding: '32px',
+            maxWidth: 400,
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+          }} onClick={e => e.stopPropagation()}>
+            <h2 style={{
+              fontFamily: 'godoRounded',
+              fontSize: '1.5rem',
+              color: 'var(--main-gray)',
+              marginBottom: 24,
+              textAlign: 'center'
+            }}>알림</h2>
+            {notifications.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {notifications.map(notification => (
+                  <div key={notification.id} style={{
+                    padding: '16px',
+                    background: notification.read ? '#f8f9fa' : 'var(--main-yellow)',
+                    borderRadius: 12,
+                    border: notification.read ? '1px solid #e9ecef' : 'none',
+                    opacity: notification.read ? 0.7 : 1
+                  }}>
+                    <p style={{
+                      margin: 0,
+                      fontFamily: 'Pretendard',
+                      fontSize: '1rem',
+                      color: 'var(--main-gray)',
+                      lineHeight: 1.5
+                    }}>
+                      {notification.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{
+                textAlign: 'center',
+                fontFamily: 'Pretendard',
+                color: 'var(--main-gray)',
+                opacity: 0.7
+              }}>
+                새로운 알림이 없습니다.
+              </p>
+            )}
+            <button
+              onClick={handleCloseNotificationModal}
+              style={{
+                marginTop: 24,
+                width: '100%',
+                padding: '12px',
+                background: 'var(--main-yellow)',
+                border: 'none',
+                borderRadius: 12,
+                color: 'var(--main-gray)',
+                fontFamily: 'Pretendard',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 투두 리스트 */}
       {todos.length > 0 && (
